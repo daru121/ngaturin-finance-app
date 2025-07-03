@@ -70,6 +70,24 @@ function Statistics() {
     return { income, expense };
   }, [filteredTransactions]);
 
+  // Define chart colors as constants
+  const chartColors = {
+    0: 'rgba(255, 99, 132, 0.9)',   // pink
+    1: 'rgba(54, 162, 235, 0.9)',    // blue
+    2: 'rgba(255, 206, 86, 0.9)',    // yellow
+    3: 'rgba(75, 192, 192, 0.9)',    // teal
+    4: 'rgba(153, 102, 255, 0.9)',   // purple
+    5: 'rgba(255, 159, 64, 0.9)',    // orange
+    6: 'rgba(75, 192, 192, 0.9)',    // teal
+    7: 'rgba(255, 99, 132, 0.9)',    // pink
+  };
+
+  // Function to get solid version of chart color
+  const getSolidColor = (index) => {
+    const color = chartColors[index % Object.keys(chartColors).length];
+    return color.replace(/, 0.9\)/, ', 1)');
+  };
+
   // Memoize chart creation to prevent unnecessary re-renders
   const createChart = useCallback(() => {
     if (chartInstance.current) {
@@ -85,16 +103,7 @@ function Statistics() {
           datasets: [
             {
               data: statistics.values,
-              backgroundColor: [
-                'rgba(255, 99, 132, 0.9)',
-                'rgba(54, 162, 235, 0.9)',
-                'rgba(255, 206, 86, 0.9)',
-                'rgba(75, 192, 192, 0.9)',
-                'rgba(153, 102, 255, 0.9)',
-                'rgba(255, 159, 64, 0.9)',
-                'rgba(75, 192, 192, 0.9)',
-                'rgba(255, 99, 132, 0.9)'
-              ],
+              backgroundColor: Object.values(chartColors),
               borderWidth: 2,
               borderColor: '#ffffff'
             }
@@ -110,7 +119,7 @@ function Statistics() {
           },
           cutout: '75%',
           animation: {
-            duration: 500 // Reduce animation duration
+            duration: 500
           }
         }
       });
@@ -386,26 +395,25 @@ function Statistics() {
           </div>
         </div>
 
-        {/* Category List - optimized rendering */}
+        {/* Category List */}
         <AnimatePresence>
           <div className="space-y-3 sm:space-y-4">
             {statistics.labels.map((label, index) => (
               <motion.div
                 key={label}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                transition={{ duration: 0.2 }}
-                className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 border border-white/50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02, translateY: -5 }}
+                className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3 sm:space-x-4">
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg ${
-                      activeChart === 'income' 
-                        ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                        : 'bg-gradient-to-br from-red-400 to-red-600'
-                    }`}>
+                    <div 
+                      className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg`}
+                      style={{ 
+                        background: `linear-gradient(135deg, ${getSolidColor(index)} 0%, ${getSolidColor(index)} 100%)`
+                      }}
+                    >
                       <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white">
                         {getCategoryIcon(label)}
                       </div>
@@ -418,9 +426,7 @@ function Statistics() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-2xl sm:text-3xl md:text-4xl font-bold ${
-                      activeChart === 'income' ? 'text-emerald-500' : 'text-red-500'
-                    }`}>
+                    <p className={`text-2xl sm:text-3xl md:text-4xl font-bold`} style={{ color: getSolidColor(index) }}>
                       {statistics.values[index]}%
                     </p>
                   </div>

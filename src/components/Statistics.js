@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import useLocalStorage from '../hooks/useLocalStorage';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function Statistics() {
   const [period, setPeriod] = useState('monthly');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [activeChart, setActiveChart] = useState('expense'); // 'expense' or 'income'
+  const [activeChart, setActiveChart] = useState('expense');
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const [transactions] = useLocalStorage('transactions', []);
@@ -70,12 +70,13 @@ function Statistics() {
     return { income, expense };
   }, [filteredTransactions]);
 
-  useEffect(() => {
+  // Memoize chart creation to prevent unnecessary re-renders
+  const createChart = useCallback(() => {
     if (chartInstance.current) {
       chartInstance.current.destroy();
     }
 
-    if (statistics.labels.length > 0) {
+    if (statistics.labels.length > 0 && chartRef.current) {
       const ctx = chartRef.current.getContext('2d');
       chartInstance.current = new Chart(ctx, {
         type: 'doughnut',
@@ -107,19 +108,29 @@ function Statistics() {
               display: false
             }
           },
-          cutout: '75%'
+          cutout: '75%',
+          animation: {
+            duration: 500 // Reduce animation duration
+          }
         }
       });
     }
+  }, [statistics]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      createChart();
+    }, 0);
 
     return () => {
+      clearTimeout(timeoutId);
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, [statistics]);
+  }, [createChart]);
 
-  const navigatePeriod = (direction) => {
+  const navigatePeriod = useCallback((direction) => {
     const newDate = new Date(currentDate);
     if (period === 'weekly') {
       newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
@@ -129,9 +140,9 @@ function Statistics() {
       newDate.setFullYear(newDate.getFullYear() + (direction === 'next' ? 1 : -1));
     }
     setCurrentDate(newDate);
-  };
+  }, [currentDate, period]);
 
-  const formatPeriodLabel = () => {
+  const formatPeriodLabel = useCallback(() => {
     const options = { month: 'long', year: 'numeric' };
     if (period === 'weekly') {
       return `Minggu ${Math.ceil(currentDate.getDate() / 7)}, ${currentDate.toLocaleDateString('id-ID', options)}`;
@@ -141,24 +152,109 @@ function Statistics() {
       return currentDate.getFullYear().toString();
     }
     return '';
-  };
+  }, [currentDate, period]);
 
-  const getCategoryIcon = (label) => {
-    // Implement the logic to return the appropriate category icon based on the label
-    // This is a placeholder and should be replaced with the actual implementation
-    return (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    );
+  // Memoize category icons to prevent re-creation on every render
+  const getCategoryIcon = useCallback((category) => {
+    switch (category) {
+      // Income icons
+      case 'Gaji':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        );
+      case 'Bonus':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        );
+      case 'Investasi':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        );
+      case 'Penjualan':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        );
+      case 'Hadiah':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4m8-12v24M4 12l8-8 8 8-8 8-8-8z" />
+          </svg>
+        );
+
+      // Expense icons
+      case 'Makanan & Minuman':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h18v18H3V3zm0 4h18M7 7v10m4-10v10m4-10v10" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a4 4 0 11-8 0 4 4 0 018 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7v4a2 2 0 01-2 2h-2" />
+          </svg>
+        );
+      case 'Transportasi':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4 4m0 0l4-4m-4 4V4" />
+          </svg>
+        );
+      case 'Belanja':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+        );
+      case 'Tagihan':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        );
+      case 'Hiburan':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        );
+      case 'Kesehatan':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        );
+      case 'Pendidikan':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        );
+      // Default icon for 'Lainnya' and any unmatched category
+      default:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          </svg>
+        );
+    }
+  }, []);
+
+  // Simplified motion variants
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
   };
 
   return (
     <div className="p-2 sm:p-4 md:p-8 relative min-h-screen bg-gradient-to-br from-slate-50 to-white">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-100/30 via-indigo-100/20 to-transparent" />
-      <div className="absolute inset-0 bg-[conic-gradient(from_45deg_at_top_right,_var(--tw-gradient-stops))] from-blue-50/20 via-indigo-50/10 to-transparent" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,_var(--tw-gradient-stops))] from-transparent via-white/50 to-transparent" />
+      {/* Background effects - simplified */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-100/30 via-indigo-100/20 to-transparent" />
       
       {/* Main Container */}
       <div className="relative rounded-[1.5rem] border border-white/30 shadow-lg bg-white/80 p-3 sm:p-4 md:p-8 overflow-hidden">
@@ -170,12 +266,11 @@ function Statistics() {
               {['weekly', 'monthly', 'yearly'].map((p) => (
                 <motion.button
                   key={p}
-                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setPeriod(p)}
-                  className={`flex-1 sm:flex-none text-sm sm:text-base px-3 sm:px-6 md:px-10 py-2.5 sm:py-3 md:py-3.5 rounded-md sm:rounded-lg md:rounded-xl font-medium transition-all duration-300 ${
+                  className={`flex-1 sm:flex-none text-sm sm:text-base px-3 sm:px-6 md:px-10 py-2.5 sm:py-3 md:py-3.5 rounded-md sm:rounded-lg md:rounded-xl font-medium transition-colors duration-200 ${
                     period === p
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-white/80'
                   }`}
                 >
@@ -185,13 +280,12 @@ function Statistics() {
             </div>
           </div>
 
-          {/* Period Navigation */}
+          {/* Period Navigation - simplified animations */}
           <div className="flex items-center justify-between px-1 sm:px-2 md:px-4">
             <motion.button
-              whileHover={{ scale: 1.05, rotate: -5 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigatePeriod('prev')}
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl hover:bg-white/80 text-gray-400 hover:text-blue-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl bg-white/60 backdrop-blur-xl border border-white/50"
+              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl hover:bg-white/80 text-gray-400 hover:text-blue-600 transition-colors duration-200 flex items-center justify-center shadow-lg bg-white/60 backdrop-blur-xl border border-white/50"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -201,10 +295,9 @@ function Statistics() {
               {formatPeriodLabel()}
             </h2>
             <motion.button
-              whileHover={{ scale: 1.05, rotate: 5 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigatePeriod('next')}
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl hover:bg-white/80 text-gray-400 hover:text-blue-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl bg-white/60 backdrop-blur-xl border border-white/50"
+              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl hover:bg-white/80 text-gray-400 hover:text-blue-600 transition-colors duration-200 flex items-center justify-center shadow-lg bg-white/60 backdrop-blur-xl border border-white/50"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -213,13 +306,13 @@ function Statistics() {
           </div>
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary Cards - simplified animations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-8 mb-6 sm:mb-8 md:mb-10">
           {/* Income Card */}
           <motion.button
-            whileHover={{ scale: 1.02, translateY: -5 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setActiveChart('income')}
-            className={`backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500 group ${
+            className={`backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 border border-white/50 transition-colors duration-200 ${
               activeChart === 'income' ? 'ring-2 ring-emerald-500/30 ring-offset-4 ring-offset-gray-50' : ''
             }`}
           >
@@ -240,9 +333,9 @@ function Statistics() {
 
           {/* Expense Card */}
           <motion.button
-            whileHover={{ scale: 1.02, translateY: -5 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setActiveChart('expense')}
-            className={`backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500 group ${
+            className={`backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 border border-white/50 transition-colors duration-200 ${
               activeChart === 'expense' ? 'ring-2 ring-red-500/30 ring-offset-4 ring-offset-gray-50' : ''
             }`}
           >
@@ -293,48 +386,53 @@ function Statistics() {
           </div>
         </div>
 
-        {/* Category List */}
-        <div className="space-y-3 sm:space-y-4">
-          {statistics.labels.map((label, index) => (
-            <motion.div
-              key={label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.02, translateY: -5 }}
-              className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3 sm:space-x-4">
-                  <div className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg ${
-                    activeChart === 'income' 
-                      ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                      : 'bg-gradient-to-br from-red-400 to-red-600'
-                  }`}>
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white">
-                      {getCategoryIcon(label)}
+        {/* Category List - optimized rendering */}
+        <AnimatePresence>
+          <div className="space-y-3 sm:space-y-4">
+            {statistics.labels.map((label, index) => (
+              <motion.div
+                key={label}
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: 0.2 }}
+                className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 border border-white/50"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg ${
+                      activeChart === 'income' 
+                        ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                        : 'bg-gradient-to-br from-red-400 to-red-600'
+                    }`}>
+                      <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white">
+                        {getCategoryIcon(label)}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 mb-1">{label}</h3>
+                      <p className="text-sm sm:text-base text-gray-500">
+                        Rp {statistics.amounts[index].toLocaleString()}
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 mb-1">{label}</h3>
-                    <p className="text-sm sm:text-base text-gray-500">
-                      Rp {statistics.amounts[index].toLocaleString()}
+                  <div className="text-right">
+                    <p className={`text-2xl sm:text-3xl md:text-4xl font-bold ${
+                      activeChart === 'income' ? 'text-emerald-500' : 'text-red-500'
+                    }`}>
+                      {statistics.values[index]}%
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-2xl sm:text-3xl md:text-4xl font-bold ${
-                    activeChart === 'income' ? 'text-emerald-500' : 'text-red-500'
-                  }`}>
-                    {statistics.values[index]}%
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
-export default Statistics; 
+// Wrap component with React.memo for additional optimization
+export default React.memo(Statistics); 

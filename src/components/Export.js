@@ -4,6 +4,8 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import { motion } from 'framer-motion';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 const DocumentIcon = () => (
   <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
@@ -55,90 +57,177 @@ function Export() {
     return { income, expense, categories };
   }, [filteredTransactions]);
 
-  const handleExport = () => {
-    setIsExporting(true);
+  const generatePDF = () => {
+    const doc = new jsPDF();
     
-    setTimeout(() => {
-      try {
-        const doc = new jsPDF();
-        
-        // Add title
-        doc.setFontSize(20);
-        doc.setTextColor(44, 62, 80);
-        doc.text('Laporan Keuangan', 105, 15, { align: 'center' });
-        
-        // Add period
-        doc.setFontSize(12);
-        doc.setTextColor(52, 73, 94);
-        doc.text(`Periode: ${startDate.toLocaleDateString('id-ID')} - ${endDate.toLocaleDateString('id-ID')}`, 105, 25, { align: 'center' });
-        
-        // Add summary section
-        autoTable(doc, {
-          head: [['Ringkasan']],
-          body: [
-            ['Total Transaksi', filteredTransactions.length],
-            ['Total Pendapatan', `Rp ${summaries.income.toLocaleString()}`],
-            ['Total Pengeluaran', `Rp ${summaries.expense.toLocaleString()}`],
-            ['Saldo', `Rp ${(summaries.income - summaries.expense).toLocaleString()}`]
-          ],
-          startY: 35,
-          theme: 'grid',
-          headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-          alternateRowStyles: { fillColor: [241, 245, 249] },
-          margin: { top: 35 },
-        });
-        
-        // Add category summary
-        autoTable(doc, {
-          head: [['Kategori', 'Pendapatan', 'Pengeluaran']],
-          body: Object.entries(summaries.categories).map(([category, data]) => [
-            category,
-            `Rp ${data.income.toLocaleString()}`,
-            `Rp ${data.expense.toLocaleString()}`
-          ]),
-          startY: doc.lastAutoTable.finalY + 10,
-          theme: 'grid',
-          headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-          alternateRowStyles: { fillColor: [241, 245, 249] },
-        });
-        
-        // Add transactions table
-        autoTable(doc, {
-          head: [['Tanggal', 'Tipe', 'Aset', 'Kategori', 'Jumlah', 'Catatan']],
-          body: filteredTransactions.map(t => [
-            new Date(t.date).toLocaleDateString('id-ID'),
-            t.type === 'income' ? 'Pendapatan' : 'Pengeluaran',
-            t.asset === 'cash' ? 'Tunai' : 'Bank',
-            t.category,
-            `Rp ${parseFloat(t.amount).toLocaleString()}`,
-            t.note || ''
-          ]),
-          startY: doc.lastAutoTable.finalY + 10,
-          theme: 'grid',
-          headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-          alternateRowStyles: { fillColor: [241, 245, 249] },
-          columnStyles: {
-            0: { cellWidth: 25 },
-            1: { cellWidth: 25 },
-            2: { cellWidth: 20 },
-            3: { cellWidth: 30 },
-            4: { cellWidth: 30 },
-            5: { cellWidth: 'auto' }
-          },
-          didDrawPage: function(data) {
-            // Add header to each page
-            doc.setFontSize(8);
-            doc.setTextColor(128);
-            doc.text('Laporan Keuangan - ' + new Date().toLocaleDateString('id-ID'), data.settings.margin.left, 10);
-          }
-        });
+    // Set font
+    doc.setFont('helvetica');
+    
+    // Helper function for consistent header styling
+    const addSectionHeader = (text, yPosition) => {
+      doc.setFillColor(30, 136, 229);
+      doc.rect(20, yPosition, 170, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text(text, 25, yPosition + 6);
+      return yPosition + 15;
+    };
 
-        // Save the PDF
-        doc.save(`Laporan_Keuangan_${startDate.toLocaleDateString('id-ID')}_${endDate.toLocaleDateString('id-ID')}.pdf`);
-      } finally {
-        setIsExporting(false);
+    // Helper function for adding page header
+    const addPageHeader = (pageNumber) => {
+      doc.setFontSize(10);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Halaman ${pageNumber}`, 185, 10, { align: 'right' });
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 15, 190, 15);
+    };
+
+    // Title and Date
+    doc.setFontSize(20);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Laporan Keuangan', 105, 25, { align: 'center' });
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100, 100, 100);
+    const startDate = dateRange[0] ? format(dateRange[0], 'd MMMM yyyy', { locale: id }) : '';
+    const endDate = dateRange[1] ? format(dateRange[1], 'd MMMM yyyy', { locale: id }) : '';
+    doc.text(`Periode: ${startDate} - ${endDate}`, 105, 35, { align: 'center' });
+
+    // Add page number
+    addPageHeader(1);
+    
+    let yPos = 45;
+
+    // Summary Section
+    yPos = addSectionHeader('Ringkasan', yPos);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    
+    const summaryData = [
+      ['Total Transaksi', filteredTransactions.length.toString()],
+      ['Total Pendapatan', `Rp ${summaries.income.toLocaleString()}`],
+      ['Total Pengeluaran', `Rp ${summaries.expense.toLocaleString()}`],
+      ['Total keseluruhan', `Rp ${(summaries.income - summaries.expense).toLocaleString()}`]
+    ];
+
+    summaryData.forEach(([label, value]) => {
+      doc.text(label, 30, yPos);
+      doc.text(value, 180, yPos, { align: 'right' });
+      yPos += 7;
+    });
+
+    yPos += 10;
+
+    // Categories Section
+    yPos = addSectionHeader('Kategori', yPos);
+    
+    // Categories table header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(25, yPos - 5, 160, 8, 'F');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Kategori', 30, yPos);
+    doc.text('Pendapatan', 100, yPos);
+    doc.text('Pengeluaran', 150, yPos);
+    yPos += 8;
+
+    // Categories Content
+    doc.setTextColor(0, 0, 0);
+    const allCategories = [...new Set(filteredTransactions.map(t => t.category))];
+    
+    allCategories.forEach((category, index) => {
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 30;
+        addPageHeader(doc.internal.getNumberOfPages());
       }
-    }, 500);
+
+      const income = filteredTransactions
+        .filter(t => t.category === category && t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+      const expense = filteredTransactions
+        .filter(t => t.category === category && t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      // Add zebra striping
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(25, yPos - 5, 160, 8, 'F');
+      }
+      
+      doc.text(category, 30, yPos);
+      doc.text(`Rp ${income.toLocaleString()}`, 100, yPos);
+      doc.text(`Rp ${expense.toLocaleString()}`, 150, yPos);
+      yPos += 8;
+    });
+
+    yPos += 10;
+
+    // Transactions Section
+    if (yPos > 220) {
+      doc.addPage();
+      yPos = 30;
+      addPageHeader(doc.internal.getNumberOfPages());
+    }
+
+    yPos = addSectionHeader('Detail Transaksi', yPos);
+    
+    // Transaction table header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(25, yPos - 5, 160, 8, 'F');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Tanggal', 30, yPos);
+    doc.text('Tipe', 65, yPos);
+    doc.text('Kategori', 95, yPos);
+    doc.text('Jumlah', 135, yPos);
+    doc.text('Catatan', 165, yPos);
+    yPos += 8;
+
+    // Transactions Content
+    doc.setTextColor(0, 0, 0);
+    filteredTransactions.forEach((transaction, index) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 30;
+        addPageHeader(doc.internal.getNumberOfPages());
+      }
+
+      // Add zebra striping
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(25, yPos - 5, 160, 8, 'F');
+      }
+
+      const date = format(new Date(transaction.date), 'dd/MM/yyyy');
+      const type = transaction.type === 'income' ? 'Pendapatan' : 'Pengeluaran';
+      const amount = `Rp ${transaction.amount.toLocaleString()}`;
+      const notes = transaction.notes || '-';
+      const truncatedNotes = notes.length > 15 ? notes.substring(0, 12) + '...' : notes;
+
+      doc.text(date, 30, yPos);
+      doc.text(type, 65, yPos);
+      doc.text(transaction.category, 95, yPos);
+      doc.text(amount, 135, yPos);
+      doc.text(truncatedNotes, 165, yPos);
+      
+      yPos += 8;
+    });
+
+    // Add footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(10);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Dicetak pada: ${format(new Date(), 'dd MMMM yyyy HH:mm', { locale: id })}`,
+        105,
+        285,
+        { align: 'center' }
+      );
+    }
+    
+    // Save PDF
+    doc.save(`Laporan_Keuangan_${format(dateRange[0], 'dd-MM-yyyy')}_${format(dateRange[1], 'dd-MM-yyyy')}.pdf`);
   };
 
   return (
@@ -258,7 +347,7 @@ function Export() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={handleExport}
+              onClick={generatePDF}
               disabled={!startDate || !endDate || filteredTransactions.length === 0 || isExporting}
               className={`w-full max-w-md mx-auto py-3 px-6 rounded-xl text-white font-medium text-sm sm:text-base flex items-center justify-center space-x-3 transition-all duration-300 ${
                 startDate && endDate && filteredTransactions.length > 0 && !isExporting

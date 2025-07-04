@@ -131,12 +131,11 @@ const AnimatedNumber = ({ value, isIncome }) => {
   return (
     <motion.div
       key={value}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ 
-        type: "spring",
-        stiffness: 300,
-        damping: 20
+        duration: 0.2,
+        ease: "easeOut"
       }}
       className={`relative text-3xl font-bold ${
         isIncome === undefined 
@@ -148,17 +147,9 @@ const AnimatedNumber = ({ value, isIncome }) => {
             : 'text-red-500'
       }`}
     >
-      <motion.span
-        initial={{ scale: 0.5 }}
-        animate={{ scale: 1 }}
-        transition={{ 
-          type: "spring",
-          stiffness: 400,
-          damping: 10
-        }}
-      >
+      <span>
         Rp {Math.abs(value).toLocaleString()}
-      </motion.span>
+      </span>
     </motion.div>
   );
 };
@@ -245,11 +236,20 @@ function Transactions({ showAddModal, setShowAddModal }) {
       notes
     };
     setTransactions([...transactions, newTransaction]);
-    setShowModal(false);
+    
+    // Close the modal first
+    setShowAddModal(false);
+    
+    // Reset form
     resetForm();
+    
     // Show success animation
     setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+    
+    // Hide success animation after 2 seconds (reduced from 3s for better UX)
+    setTimeout(() => {
+      setShowSuccess(false);
+    }, 2000);
   };
 
   const resetForm = () => {
@@ -622,11 +622,15 @@ function Transactions({ showAddModal, setShowAddModal }) {
                     {transactions.map(transaction => (
                       <motion.div
                         key={transaction.id}
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        whileHover={{ scale: 1.02 }}
-                        transition={{ type: "spring", stiffness: 300 }}
-                        className="group relative bg-white/60 backdrop-blur-xl rounded-2xl border border-gray-100/20 shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden"
+                        whileHover={{ scale: 1.01 }}
+                        transition={{ 
+                          duration: 0.2,
+                          ease: "easeOut"
+                        }}
+                        style={{ willChange: 'transform' }}
+                        className="group relative bg-white/60 backdrop-blur-xl rounded-2xl border border-gray-100/20 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden"
                       >
                         <div className="relative p-4">
                           <div className="flex items-center justify-between gap-4">
@@ -695,7 +699,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
               ))
             ) : (
               <motion.div 
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col items-center justify-center py-16 px-4"
               >
@@ -720,25 +724,29 @@ function Transactions({ showAddModal, setShowAddModal }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/20 backdrop-blur-xl flex items-start justify-center z-50 p-4 overflow-y-auto"
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto"
             >
               <motion.div
-                initial={{ scale: 0.9, y: 50 }}
+                initial={{ scale: 0.95, y: 20 }}
                 animate={{ 
                   scale: 1,
                   y: 0,
                   transition: {
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 30
+                    duration: 0.2,
+                    ease: "easeOut"
                   }
                 }}
                 exit={{ 
-                  scale: 0.9,
-                  y: 50,
-                  opacity: 0
+                  scale: 0.95,
+                  y: 20,
+                  opacity: 0,
+                  transition: {
+                    duration: 0.15
+                  }
                 }}
-                className="bg-white/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl border border-white/50 mt-4 sm:mt-8 mb-20"
+                style={{ willChange: 'transform' }}
+                className="bg-white/90 backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl border border-white/50 mt-4 sm:mt-8 mb-20"
               >
                 {/* Mobile Header */}
                 <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -927,25 +935,26 @@ function Transactions({ showAddModal, setShowAddModal }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/20 backdrop-blur-xl flex items-center justify-center z-50 p-4"
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             >
               <motion.div
-                initial={{ scale: 0 }}
+                initial={{ scale: 0.9 }}
                 animate={{ 
                   scale: 1,
                   transition: {
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 25
+                    duration: 0.2,
+                    ease: "easeOut"
                   }
                 }}
                 exit={{ 
-                  scale: 0,
+                  scale: 0.9,
                   opacity: 0,
                   transition: {
-                    duration: 0.2
+                    duration: 0.15
                   }
                 }}
+                style={{ willChange: 'transform' }}
                 className="relative"
               >
                 <motion.div
@@ -999,7 +1008,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{
                     opacity: 1,
                     y: 0,
@@ -1089,7 +1098,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                       </svg>
                     </motion.div>
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 }}
                       className="space-y-2"
@@ -1205,7 +1214,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{
                     opacity: 1,
                     y: 0,
@@ -1320,7 +1329,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
 
                   {/* Amount */}
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
                     className="bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30"
@@ -1337,7 +1346,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
 
                   {/* Date */}
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.6 }}
                   >
@@ -1355,7 +1364,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                   {/* Notes */}
                   {selectedTransaction.notes && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.7 }}
                     >

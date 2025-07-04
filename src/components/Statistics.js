@@ -137,6 +137,10 @@ function Statistics() {
               display: false
             },
             tooltip: {
+              enabled: true,
+              animation: {
+                duration: 100
+              },
               callbacks: {
                 label: function(context) {
                   const value = context.raw;
@@ -297,50 +301,122 @@ function Statistics() {
     return data;
   }, [statistics]);
 
-  // Effect to handle chart creation and updates
+  // Optimized chart options
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        enabled: true,
+        animation: {
+          duration: 100
+        },
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.parsed || 0;
+            const total = context.dataset.data.reduce((acc, curr) => acc + curr, 0);
+            const percentage = Math.round((value / total) * 100);
+            return `${label}: ${percentage}%`;
+          }
+        }
+      }
+    },
+    cutout: '70%',
+    animation: {
+      duration: 300,
+      easing: 'easeOutQuart'
+    },
+    elements: {
+      arc: {
+        borderWidth: 0
+      }
+    },
+    layout: {
+      padding: 0
+    }
+  }), []);
+
+  // Effect to update chart with optimized options
   useEffect(() => {
     if (!chartRef.current || !chartData) return;
 
-    // Destroy existing chart instance if it exists
     if (chartInstance.current) {
       chartInstance.current.destroy();
     }
 
-    // Create new chart instance
     const ctx = chartRef.current.getContext('2d');
     chartInstance.current = new Chart(ctx, {
       type: 'doughnut',
       data: chartData,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                const label = context.label || '';
-                const value = context.parsed || 0;
-                const total = context.dataset.data.reduce((acc, curr) => acc + curr, 0);
-                const percentage = Math.round((value / total) * 100);
-                return `${label}: ${percentage}%`;
-              }
-            }
-          }
-        },
-        cutout: '70%'
-      }
+      options: chartOptions
     });
 
-    // Cleanup function
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, [chartData]);
+  }, [chartData, chartOptions]);
+
+  const renderPeriodButtons = () => (
+    <div className="inline-flex bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-1 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white/50">
+      {['weekly', 'monthly', 'yearly'].map((p) => (
+        <motion.button
+          key={p}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          transition={{ duration: 0.1 }}
+          onClick={() => setPeriod(p)}
+          className={`px-4 sm:px-8 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            period === p
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+              : 'text-gray-600 hover:bg-white/80'
+          }`}
+        >
+          {p === 'weekly' ? 'Mingguan' : p === 'monthly' ? 'Bulanan' : 'Tahunan'}
+        </motion.button>
+      ))}
+    </div>
+  );
+
+  const renderSummaryCard = (type) => {
+    const isIncome = type === 'income';
+    const amount = isIncome ? totals.income : totals.expense;
+    const color = isIncome ? 'emerald' : 'red';
+
+    return (
+      <motion.div
+        whileHover={{ y: -2, scale: 1.01 }}
+        transition={{ duration: 0.2 }}
+        onClick={() => setActiveChart(type)}
+        style={{ willChange: 'transform' }}
+        className={`group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-${color}-100/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 cursor-pointer ${
+          activeChart === type ? `ring-2 ring-${color}-500 ring-offset-2` : ''
+        }`}
+      >
+        <div className={`absolute inset-0 bg-gradient-to-r from-${color}-500/5 to-${color}-500/0 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
+        <div className="relative">
+          <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-${color}-500 transform group-hover:scale-110 transition-transform duration-500`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={isIncome ? "M12 4v16m8-8H4" : "M20 12H4"} />
+              </svg>
+            </div>
+            <h3 className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300">
+              {isIncome ? 'Total Pendapatan' : 'Total Pengeluaran'}
+            </h3>
+          </div>
+          <div className={`relative text-3xl font-bold text-${color}-500`}>
+            Rp {amount.toLocaleString()}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="p-4 sm:p-6 md:p-8 min-h-screen bg-gradient-to-br from-slate-50 to-white">
@@ -365,32 +441,17 @@ function Statistics() {
 
       {/* Period Selection */}
       <div className="mb-6">
-        <div className="inline-flex bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-1 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white/50">
-          {['weekly', 'monthly', 'yearly'].map((p) => (
-            <motion.button
-              key={p}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setPeriod(p)}
-              className={`px-4 sm:px-8 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                period === p
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
-                  : 'text-gray-600 hover:bg-white/80'
-              }`}
-            >
-              {p === 'weekly' ? 'Mingguan' : p === 'monthly' ? 'Bulanan' : 'Tahunan'}
-            </motion.button>
-          ))}
-        </div>
+        {renderPeriodButtons()}
       </div>
 
       {/* Period Navigation */}
       <div className="flex items-center justify-between mb-6">
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.1 }}
           onClick={() => navigatePeriod('prev')}
-          className="p-2 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-300 text-gray-600 hover:text-blue-600"
+          className="p-2 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-200 text-gray-600 hover:text-blue-600"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -400,10 +461,11 @@ function Statistics() {
           {formatPeriodLabel()}
         </h2>
         <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.1 }}
           onClick={() => navigatePeriod('next')}
-          className="p-2 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-300 text-gray-600 hover:text-blue-600"
+          className="p-2 rounded-xl bg-white shadow-lg hover:shadow-xl transition-all duration-200 text-gray-600 hover:text-blue-600"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -413,55 +475,8 @@ function Statistics() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        {/* Income Card */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          onClick={() => setActiveChart('income')}
-          className={`group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-emerald-100/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-500 cursor-pointer ${
-            activeChart === 'income' ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
-          }`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-emerald-500/0 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative">
-            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-emerald-500 transform group-hover:scale-110 transition-transform duration-500">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300">Total Pendapatan</h3>
-            </div>
-            <div className="relative text-3xl font-bold text-emerald-500">
-              Rp {totals.income.toLocaleString()}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Expense Card */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          onClick={() => setActiveChart('expense')}
-          className={`group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-red-100/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-500 cursor-pointer ${
-            activeChart === 'expense' ? 'ring-2 ring-red-500 ring-offset-2' : ''
-          }`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-red-500/0 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative">
-            <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-red-500 transform group-hover:scale-110 transition-transform duration-500">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12H4" />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300">Total Pengeluaran</h3>
-            </div>
-            <div className="relative text-3xl font-bold text-red-500">
-              Rp {totals.expense.toLocaleString()}
-            </div>
-          </div>
-        </motion.div>
+        {renderSummaryCard('income')}
+        {renderSummaryCard('expense')}
       </div>
 
       {/* Chart Container */}
@@ -478,9 +493,13 @@ function Statistics() {
           {statistics.labels.map((label, index) => (
             <motion.div
               key={label}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              transition={{ 
+                duration: 0.2,
+                delay: index * 0.05
+              }}
+              style={{ willChange: 'transform' }}
               className="flex items-center justify-between gap-4"
             >
               <div className="flex items-center gap-4">

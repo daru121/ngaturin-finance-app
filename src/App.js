@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Transactions from './components/Transactions';
 import Statistics from './components/Statistics';
 import Export from './components/Export';
+import Settings from './components/Settings';
 import Preloader from './components/Preloader';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -135,6 +136,17 @@ function App() {
                       exit="exit"
                     >
                       <Export />
+                    </motion.div>
+                  )}
+                  {activeTab === 'settings' && (
+                    <motion.div
+                      key="settings"
+                      variants={contentVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                    >
+                      <Settings />
                     </motion.div>
                   )}
                 </AnimatePresence>

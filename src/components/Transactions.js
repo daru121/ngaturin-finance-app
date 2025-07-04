@@ -127,11 +127,45 @@ const unformatNumber = (str) => {
   return str.replace(/[^\d]/g, '');
 };
 
-function Transactions() {
+const AnimatedNumber = ({ value, isIncome }) => {
+  return (
+    <motion.div
+      key={value}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 300,
+        damping: 20
+      }}
+      className={`relative text-3xl font-bold ${
+        isIncome === undefined 
+          ? value >= 0 
+            ? 'text-emerald-500' 
+            : 'text-red-500'
+          : isIncome 
+            ? 'text-emerald-500' 
+            : 'text-red-500'
+      }`}
+    >
+      <motion.span
+        initial={{ scale: 0.5 }}
+        animate={{ scale: 1 }}
+        transition={{ 
+          type: "spring",
+          stiffness: 400,
+          damping: 10
+        }}
+      >
+        Rp {Math.abs(value).toLocaleString()}
+      </motion.span>
+    </motion.div>
+  );
+};
+
+function Transactions({ showAddModal, setShowAddModal }) {
   const [startDate, setStartDate] = useState(new Date());
   const [activeTab, setActiveTab] = useState('daily');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [transactionType, setTransactionType] = useState('income');
   const [transactions, setTransactions] = useLocalStorage('transactions', []);
   const [newTransaction, setNewTransaction] = useState({
     date: new Date(),
@@ -154,6 +188,42 @@ function Transactions() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, id: null });
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+
+  // Add Indonesian locale
+  const indonesianLocale = {
+    months: [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
+    ],
+    weekdays: [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu"
+    ],
+    weekdaysShort: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"]
+  };
+
+  // Helper function to format date to Indonesian format
+  const formatToIndonesian = (date) => {
+    const day = date.getDate();
+    const month = indonesianLocale.months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
 
   const handleAmountChange = (e) => {
     const value = e.target.value;
@@ -214,20 +284,26 @@ function Transactions() {
     }
   }, [startDate, view]);
 
+  // Filter transactions based on selected date and view
   const filteredTransactions = useMemo(() => {
     return transactions
       .filter(transaction => {
         const transactionDate = new Date(transaction.date);
         if (view === 'daily') {
           return (
+            transactionDate.getDate() === startDate.getDate() &&
             transactionDate.getMonth() === startDate.getMonth() &&
             transactionDate.getFullYear() === startDate.getFullYear()
           );
         } else {
-          return transactionDate.getFullYear() === startDate.getFullYear();
+          return (
+            transactionDate.getMonth() === startDate.getMonth() &&
+            transactionDate.getFullYear() === startDate.getFullYear()
+          );
         }
       })
       .filter(transaction => {
+        if (!searchQuery) return true;
         const searchLower = searchQuery.toLowerCase();
         return (
           transaction.category.toLowerCase().includes(searchLower) ||
@@ -248,37 +324,21 @@ function Transactions() {
     return { income, expense, total: income - expense };
   }, [filteredTransactions]);
 
+  // Group transactions by date
   const groupedTransactions = useMemo(() => {
     const groups = {};
     filteredTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
-      let dateStr;
+      const dateStr = formatToIndonesian(date);
       
-      if (view === 'daily') {
-        dateStr = date.toLocaleDateString('id-ID', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
-      } else {
-        dateStr = date.toLocaleDateString('id-ID', {
-          month: 'long',
-          year: 'numeric'
-        });
-      }
-
       if (!groups[dateStr]) {
         groups[dateStr] = [];
       }
       groups[dateStr].push(transaction);
     });
 
-    Object.keys(groups).forEach(key => {
-      groups[key].sort((a, b) => new Date(b.date) - new Date(a.date));
-    });
-
     return groups;
-  }, [filteredTransactions, view]);
+  }, [filteredTransactions]);
 
   const periodTitle = useMemo(() => {
     if (view === 'daily') {
@@ -288,65 +348,135 @@ function Transactions() {
     }
   }, [view]);
 
+  // Function to check if a date has transactions
+  const hasTransactions = (date) => {
+    return transactions.some(transaction => {
+      const transactionDate = new Date(transaction.date);
+      return (
+        transactionDate.getDate() === date.getDate() &&
+        transactionDate.getMonth() === date.getMonth() &&
+        transactionDate.getFullYear() === date.getFullYear()
+      );
+    });
+  };
+
+  // Function to get transaction total for a date
+  const getTransactionTotal = (date) => {
+    return transactions
+      .filter(transaction => {
+        const transactionDate = new Date(transaction.date);
+        return (
+          transactionDate.getDate() === date.getDate() &&
+          transactionDate.getMonth() === date.getMonth() &&
+          transactionDate.getFullYear() === date.getFullYear()
+        );
+      })
+      .reduce((total, transaction) => {
+        return transaction.type === 'income' 
+          ? total + transaction.amount 
+          : total - transaction.amount;
+      }, 0);
+  };
+
+  // Custom day component for DatePicker
+  const CustomDay = ({ date, dayOfMonth, ...props }) => {
+    const hasTransactionsOnDay = hasTransactions(date);
+    const total = getTransactionTotal(date);
+    
+    return (
+      <div
+        className={`relative w-8 h-8 flex items-center justify-center ${
+          props.selected 
+            ? 'bg-blue-500 text-white rounded-full' 
+            : hasTransactionsOnDay 
+              ? 'bg-blue-50 rounded-full' 
+              : ''
+        }`}
+        {...props}
+      >
+        {dayOfMonth}
+        {hasTransactionsOnDay && (
+          <div className={`absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 rounded-full ${
+            total >= 0 ? 'bg-emerald-500' : 'bg-red-500'
+          }`} />
+        )}
+      </div>
+    );
+  };
+
+  // Custom header for DatePicker with Indonesian month names
+  const CustomHeader = ({
+    date,
+    decreaseMonth,
+    increaseMonth,
+    prevMonthButtonDisabled,
+    nextMonthButtonDisabled,
+  }) => (
+    <div className="flex items-center justify-between px-2 py-2">
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={decreaseMonth}
+        disabled={prevMonthButtonDisabled}
+        className="p-1 hover:bg-gray-100 rounded-full transition-colors duration-200"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </motion.button>
+      <h3 className="text-base font-semibold text-gray-800">
+        {`${indonesianLocale.months[date.getMonth()]} ${date.getFullYear()}`}
+      </h3>
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={increaseMonth}
+        disabled={nextMonthButtonDisabled}
+        className="p-1 hover:bg-gray-100 rounded-full transition-colors duration-200"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </motion.button>
+    </div>
+  );
+
   return (
-    <div className="p-2 sm:p-4 md:p-8 relative min-h-screen bg-gradient-to-br from-slate-50 to-white">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-100/30 via-indigo-100/20 to-transparent" />
-      <div className="absolute inset-0 bg-[conic-gradient(from_45deg_at_top_right,_var(--tw-gradient-stops))] from-blue-50/20 via-indigo-50/10 to-transparent" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,_var(--tw-gradient-stops))] from-transparent via-white/50 to-transparent" />
-      
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white/80 p-4 sm:p-6 md:p-8">
       {/* Main Container */}
-      <div className="relative rounded-[1.5rem] border border-white/30 shadow-lg bg-white/80 p-3 sm:p-4 md:p-8 overflow-hidden">
-        {/* Header Section */}
-        <div className="relative mb-4 sm:mb-6 md:mb-8">
-          <div className="flex flex-col mb-4 sm:mb-6 md:mb-8">
-            <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
-              {/* Logo */}
-              <div className="relative group">
-                <div className="absolute -inset-0.5 sm:-inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl blur opacity-50 group-hover:opacity-75 transition duration-500 animate-pulse"></div>
-                <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-2 sm:p-3 md:p-5 rounded-xl sm:rounded-2xl shadow-lg transform transition-all duration-500 group-hover:scale-105">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 transform transition duration-500">
-                    <path 
-                      d="M4 7C4 5.89543 4.89543 5 6 5H18C19.1046 5 20 5.89543 20 7V17C20 18.1046 19.1046 19 18 19H6C4.89543 19 4 18.1046 4 17V7Z" 
-                      stroke="white" 
-                      strokeWidth="2"
-                      className="drop-shadow-lg"
-                    />
-                    <path 
-                      d="M8 9H16M8 12H16M8 15H13" 
-                      stroke="white" 
-                      strokeWidth="2" 
-                      strokeLinecap="round"
-                      className="drop-shadow-lg"
-                    />
-                  </svg>
-                </div>
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-[2rem] blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+              <div className="absolute inset-0 bg-white/50 rounded-[2rem] backdrop-blur-xl transform rotate-6 scale-90 group-hover:rotate-12 transition-transform duration-300"></div>
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 p-3 sm:p-4 rounded-[2rem] shadow-lg transform transition-all duration-300 group-hover:translate-x-1 group-hover:-translate-y-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
-              
-              {/* Title */}
-              <div>
-                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient tracking-tight">
-                  Ngaturin
-                </h1>
-                <p className="text-xs sm:text-sm text-gray-500 font-medium tracking-wide mt-0.5 sm:mt-1">{formattedPeriod}</p>
-              </div>
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Transaksi</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">{formattedPeriod}</p>
             </div>
           </div>
         </div>
 
-        {/* Controls Container */}
-        <div className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl md:rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.04)] p-3 sm:p-4 md:p-8 border border-white/50">
-          {/* View Toggle */}
-          <div className="flex items-center justify-center mb-4 sm:mb-6 md:mb-8">
-            <div className="bg-gray-100/50 backdrop-blur-sm rounded-lg sm:rounded-xl md:rounded-2xl p-1 sm:p-1.5 md:p-2 inline-flex shadow-inner w-full sm:w-auto">
+        {/* Controls */}
+        <div className="space-y-4 sm:space-y-6 mb-8">
+          {/* View Toggle and Date Navigation */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="inline-flex bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-1 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-white/50">
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setView('daily')}
-                className={`flex-1 sm:flex-none text-sm sm:text-base px-3 sm:px-6 md:px-10 py-2.5 sm:py-3 md:py-3.5 rounded-md sm:rounded-lg md:rounded-xl font-medium transition-all duration-300 ${
+                className={`flex-1 px-4 sm:px-8 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   view === 'daily'
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/80'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'text-gray-600 hover:bg-white/80'
                 }`}
               >
                 Harian
@@ -355,273 +485,440 @@ function Transactions() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setView('monthly')}
-                className={`flex-1 sm:flex-none text-sm sm:text-base px-3 sm:px-6 md:px-10 py-2.5 sm:py-3 md:py-3.5 rounded-md sm:rounded-lg md:rounded-xl font-medium transition-all duration-300 ${
+                className={`flex-1 px-4 sm:px-8 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   view === 'monthly'
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/80'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'text-gray-600 hover:bg-white/80'
                 }`}
               >
                 Bulanan
               </motion.button>
             </div>
-          </div>
 
-          {/* Period Navigation */}
-          <div className="flex items-center justify-between px-1 sm:px-2 md:px-4 mb-4 sm:mb-6 md:mb-8">
-            <motion.button
-              whileHover={{ scale: 1.05, rotate: -5 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                const newDate = new Date(startDate);
-                if (view === 'daily') {
-                  newDate.setMonth(newDate.getMonth() - 1);
-                } else {
-                  newDate.setFullYear(newDate.getFullYear() - 1);
-                }
-                setStartDate(newDate);
-              }}
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl hover:bg-white/80 text-gray-400 hover:text-blue-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl bg-white/60 backdrop-blur-xl border border-white/50"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 tracking-wide">
-              {periodTitle}
-            </h2>
-            <motion.button
-              whileHover={{ scale: 1.05, rotate: 5 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                const newDate = new Date(startDate);
-                if (view === 'daily') {
-                  newDate.setMonth(newDate.getMonth() + 1);
-                } else {
-                  newDate.setFullYear(newDate.getFullYear() + 1);
-                }
-                setStartDate(newDate);
-              }}
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl md:rounded-2xl hover:bg-white/80 text-gray-400 hover:text-blue-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl bg-white/60 backdrop-blur-xl border border-white/50"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </motion.button>
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Cari transaksi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 pl-12 sm:pl-14 md:pl-16 bg-white/60 backdrop-blur-xl rounded-lg sm:rounded-xl md:rounded-2xl text-sm sm:text-base md:text-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 shadow-lg hover:shadow-xl border border-white/50"
-            />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-gray-400 absolute left-4 sm:left-5 md:left-6 top-1/2 transform -translate-y-1/2"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            {/* DatePicker */}
+            <div className="relative group w-full sm:w-auto">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <DatePicker
+                selected={startDate}
+                onChange={(date) => setStartDate(date)}
+                dateFormat="d MMMM yyyy"
+                locale="id"
+                renderCustomHeader={CustomHeader}
+                renderDayContents={(dayOfMonth, date) => (
+                  <CustomDay date={date} dayOfMonth={dayOfMonth} />
+                )}
+                showPopperArrow={false}
+                className="w-full sm:w-auto px-4 sm:px-6 py-2.5 rounded-xl bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl border border-white/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                calendarClassName="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden"
+                dayClassName={() => "hover:bg-blue-50 rounded-full"}
+                monthClassName={() => "mt-2"}
+                weekDayClassName={() => "text-gray-400 font-medium text-center py-2"}
+                formatWeekDay={day => indonesianLocale.weekdaysShort[new Date(day).getDay()]}
               />
-            </svg>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="relative max-w-2xl mx-auto group">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Cari transaksi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-12 py-3 bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl rounded-xl text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-white/50 text-sm"
+              />
+              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+            {/* Income Card */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300 }}
+              className="group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-emerald-100/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-emerald-500/0 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative">
+                <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-emerald-500 transform group-hover:scale-110 transition-transform duration-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300">Pendapatan</h3>
+                </div>
+                <AnimatedNumber value={totals.income} isIncome={true} />
+              </div>
+            </motion.div>
+
+            {/* Expense Card */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300 }}
+              className="group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-red-100/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-red-500/0 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative">
+                <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-red-500 transform group-hover:scale-110 transition-transform duration-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12H4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300">Pengeluaran</h3>
+                </div>
+                <AnimatedNumber value={totals.expense} isIncome={false} />
+              </div>
+            </motion.div>
+
+            {/* Total Card */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300 }}
+              className="group relative bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-blue-100/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-500"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-blue-500/0 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative">
+                <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-blue-500 transform group-hover:scale-110 transition-transform duration-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-300">Total</h3>
+                </div>
+                <AnimatedNumber value={totals.total} />
+              </div>
+            </motion.div>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-8 mb-6 sm:mb-8 md:mb-10">
-          {/* Income Card */}
-          <motion.div
-            whileHover={{ scale: 1.02, translateY: -5 }}
-            className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500 group"
-          >
-            <div className="flex items-center space-x-3 sm:space-x-4 mb-3 sm:mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center transform transition-transform duration-500 group-hover:scale-110 shadow-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-600">Pendapatan</h3>
-            </div>
-            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-emerald-500 tracking-tight">
-              Rp {totals.income.toLocaleString()}
-            </p>
-          </motion.div>
-
-          {/* Expense Card */}
-          <motion.div
-            whileHover={{ scale: 1.02, translateY: -5 }}
-            className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500 group"
-          >
-            <div className="flex items-center space-x-3 sm:space-x-4 mb-3 sm:mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center transform transition-transform duration-500 group-hover:scale-110 shadow-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-600">Pengeluaran</h3>
-            </div>
-            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-red-500 tracking-tight">
-              Rp {totals.expense.toLocaleString()}
-            </p>
-          </motion.div>
-
-          {/* Total Card */}
-          <motion.div
-            whileHover={{ scale: 1.02, translateY: -5 }}
-            className="backdrop-blur-xl bg-white/60 rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl p-4 sm:p-6 md:p-8 border border-white/50 transition-all duration-500 group"
-          >
-            <div className="flex items-center space-x-3 sm:space-x-4 mb-3 sm:mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center transform transition-transform duration-500 group-hover:scale-110 shadow-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-sm sm:text-base md:text-lg font-medium text-gray-600">Total</h3>
-            </div>
-            <p className={`text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight ${totals.total >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-              Rp {totals.total.toLocaleString()}
-            </p>
-          </motion.div>
-        </div>
-
-        {/* Transaction List Container with Sticky FAB */}
-        <div className="relative">
-          <div className="space-y-4 sm:space-y-6 md:space-y-8 mb-20">
+        {/* Transaction List Container - Add padding bottom for FAB */}
+        <div className="pb-24">
+          {/* Transaction List */}
+          <div className="space-y-8">
             {Object.keys(groupedTransactions).length > 0 ? (
               Object.entries(groupedTransactions).map(([date, transactions]) => (
-                <div key={date} className="space-y-3 sm:space-y-4 md:space-y-6">
+                <div key={date} className="space-y-4">
                   {/* Date Header */}
-                  <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
-                    <div className="hidden sm:block h-[1px] flex-grow bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
-                    <div className="w-full sm:w-auto px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 md:py-3 rounded-lg sm:rounded-xl bg-white/80 backdrop-blur-xl shadow-lg border border-white/50 text-center">
-                      <h3 className="text-xs sm:text-sm md:text-base font-medium text-gray-600">{date}</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="h-px flex-grow bg-gradient-to-r from-gray-200/0 via-gray-200 to-gray-200/0"></div>
+                    <div className="px-4 py-1.5 rounded-full bg-white/60 backdrop-blur-xl border border-gray-100">
+                      <p className="text-sm font-medium text-gray-600">{date}</p>
                     </div>
-                    <div className="hidden sm:block h-[1px] flex-grow bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+                    <div className="h-px flex-grow bg-gradient-to-r from-gray-200/0 via-gray-200 to-gray-200/0"></div>
                   </div>
 
-                  {/* Transaction Items */}
-                  {transactions.map(transaction => (
-                    <motion.div
-                      key={transaction.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      whileHover={{ scale: 1.02, translateY: -5 }}
-                      className="backdrop-blur-xl bg-white rounded-lg sm:rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl p-3 sm:p-4 md:p-6 border border-white/50 transition-all duration-500"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                        <div className="flex items-center space-x-3 sm:space-x-4">
-                          <div className={`w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg ${
-                            transaction.type === 'income' 
-                              ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                              : 'bg-gradient-to-br from-red-400 to-red-600'
-                          }`}>
-                            <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 text-white drop-shadow-lg">
-                              {getCategoryIcon(transaction.category)}
+                  {/* Transactions */}
+                  <div className="space-y-4">
+                    {transactions.map(transaction => (
+                      <motion.div
+                        key={transaction.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: 1.02 }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                        className="group relative bg-white/60 backdrop-blur-xl rounded-2xl border border-gray-100/20 shadow-sm hover:shadow-md transition-all duration-500 overflow-hidden"
+                      >
+                        <div className="relative p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-12 h-12 flex items-center justify-center ${
+                                transaction.type === 'income' 
+                                  ? 'text-emerald-500'
+                                  : 'text-red-500'
+                              }`}>
+                                <div className="w-7 h-7">
+                                  {getCategoryIcon(transaction.category)}
+                                </div>
+                              </div>
+                              <div>
+                                <h3 className="text-base font-semibold text-gray-900 group-hover:text-gray-700 transition-colors duration-300">
+                                  {transaction.category}
+                                </h3>
+                                {transaction.notes && (
+                                  <p className="text-sm text-gray-500 mt-0.5 group-hover:text-gray-600 transition-colors duration-300">
+                                    {transaction.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <p className={`text-base font-semibold transition-colors duration-300 ${
+                                transaction.type === 'income' 
+                                  ? 'text-emerald-500 group-hover:text-emerald-600' 
+                                  : 'text-red-500 group-hover:text-red-600'
+                              }`}>
+                                Rp {transaction.amount.toLocaleString()}
+                              </p>
+                              <div className="flex gap-2">
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleDelete(transaction.id)}
+                                  className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors duration-300"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </motion.button>
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => {
+                                    setSelectedTransaction(transaction);
+                                    setShowPreviewModal(true);
+                                  }}
+                                  className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-blue-500 transition-colors duration-300"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </motion.button>
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 mb-0.5 sm:mb-1">{transaction.category}</h3>
-                            <p className="text-xs sm:text-sm text-gray-500">{transaction.notes}</p>
-                          </div>
                         </div>
-                        <div className="flex items-center justify-between sm:flex-col sm:items-end">
-                          <p className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-0 sm:mb-4 ${
-                            transaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
-                          }`}>
-                            Rp {transaction.amount.toLocaleString()}
-                          </p>
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleDelete(transaction.id)}
-                              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-red-400 to-red-600 text-white flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => {
-                                setSelectedTransaction(transaction);
-                                setShowPreviewModal(true);
-                              }}
-                              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 text-white flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                              </svg>
-                            </motion.button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               ))
             ) : (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col items-center justify-center py-8 sm:py-12 md:py-16 px-3 sm:px-4 md:px-8"
+                className="flex flex-col items-center justify-center py-16 px-4"
               >
-                {/* Empty state content with responsive updates */}
-                <div className="relative mb-6 sm:mb-8 group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full blur opacity-40 group-hover:opacity-75 transition duration-500 animate-pulse"></div>
-                  <div className="relative w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-2xl transform transition-all duration-500 group-hover:scale-105">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 sm:h-16 sm:w-16 text-white/90 drop-shadow-2xl transform transition-transform duration-500 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                  </div>
+                <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mb-6">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
                 </div>
-
-                {/* Empty state text with gradient */}
-                <div className="text-center space-y-3 sm:space-y-4">
-                  <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-gray-800 via-gray-600 to-gray-800 bg-clip-text text-transparent">
-                    Belum Ada Transaksi
-                  </h3>
-                  <p className="text-base sm:text-lg text-gray-500 max-w-md">
-                    Tambahkan transaksi pertama Anda untuk mulai melacak keuangan dengan lebih baik
-                  </p>
-                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Belum Ada Transaksi</h3>
+                <p className="text-sm text-gray-500 text-center max-w-sm">
+                  Tambahkan transaksi pertama Anda untuk mulai melacak keuangan dengan lebih baik
+                </p>
               </motion.div>
             )}
           </div>
         </div>
 
-        {/* Add Transaction Button - Always visible */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowModal(true)}
-          className="fixed right-6 bottom-24 z-50 w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg hover:shadow-2xl flex items-center justify-center transform transition-all duration-300"
-        >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="h-8 w-8" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2.5} 
-              d="M12 4v16m8-8H4" 
-            />
-          </svg>
-        </motion.button>
+        {/* Add Transaction Modal */}
+        <AnimatePresence>
+          {showAddModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/20 backdrop-blur-xl flex items-start justify-center z-50 p-4 overflow-y-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 50 }}
+                animate={{ 
+                  scale: 1,
+                  y: 0,
+                  transition: {
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 30
+                  }
+                }}
+                exit={{ 
+                  scale: 0.9,
+                  y: 50,
+                  opacity: 0
+                }}
+                className="bg-white/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl border border-white/50 mt-4 sm:mt-8 mb-20"
+              >
+                {/* Mobile Header */}
+                <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-800">Tambah Transaksi</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowAddModal(false)}
+                    className="w-8 h-8 flex items-center justify-center text-gray-500"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </div>
+
+                {/* Desktop Header */}
+                <div className="hidden sm:flex items-center justify-between px-6 sm:px-10 py-6 sm:py-8 border-b border-gray-100">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Tambah Transaksi</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowAddModal(false)}
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors duration-300"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-4 sm:p-10 space-y-4 sm:space-y-8">
+                  {/* Transaction Type - Mobile */}
+                  <div className="sm:hidden">
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">Jenis Transaksi</label>
+                    <div className="flex rounded-xl bg-gray-50 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setType('income')}
+                        className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          type === 'income'
+                            ? 'bg-white text-emerald-500 shadow'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Pendapatan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setType('expense')}
+                        className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                          type === 'expense'
+                            ? 'bg-white text-red-500 shadow'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Pengeluaran
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Transaction Type - Desktop */}
+                  <div className="hidden sm:block space-y-2 sm:space-y-3">
+                    <label className="text-sm sm:text-base font-medium text-gray-700">Jenis Transaksi</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="button"
+                        onClick={() => setType('income')}
+                        className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 flex flex-col items-center space-y-2 sm:space-y-3 ${
+                          type === 'income'
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-600'
+                            : 'border-gray-200 hover:border-emerald-200 hover:bg-emerald-50/50'
+                        }`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span className="font-medium">Pendapatan</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="button"
+                        onClick={() => setType('expense')}
+                        className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 flex flex-col items-center space-y-2 sm:space-y-3 ${
+                          type === 'expense'
+                            ? 'border-red-500 bg-red-50 text-red-600'
+                            : 'border-gray-200 hover:border-red-200 hover:bg-red-50/50'
+                        }`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                        </svg>
+                        <span className="font-medium">Pengeluaran</span>
+                      </motion.button>
+                    </div>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="space-y-2">
+                    <label className="text-sm sm:text-base font-medium text-gray-700">Jumlah</label>
+                    <div className="relative">
+                      <span className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm sm:text-base">Rp</span>
+                      <input
+                        type="text"
+                        value={amount ? formatNumber(amount) : ''}
+                        onChange={handleAmountChange}
+                        className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base"
+                        placeholder="0"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category */}
+                  <div className="space-y-2">
+                    <label className="text-sm sm:text-base font-medium text-gray-700">Kategori</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base"
+                      required
+                    >
+                      <option value="">Pilih Kategori</option>
+                      {type === 'income'
+                        ? categories.income.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))
+                        : categories.expense.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                    </select>
+                  </div>
+
+                  {/* Date */}
+                  <div className="space-y-2">
+                    <label className="text-sm sm:text-base font-medium text-gray-700">Tanggal</label>
+                    <DatePicker
+                      selected={date}
+                      onChange={(date) => setDate(date)}
+                      dateFormat="dd/MM/yyyy"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base"
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <label className="text-sm sm:text-base font-medium text-gray-700">Catatan (Opsional)</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base h-20 sm:h-32 resize-none"
+                      placeholder="Tambahkan catatan..."
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    className={`w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl text-white font-medium text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-300 ${
+                      type === 'income'
+                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700'
+                        : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                    }`}
+                  >
+                    Simpan
+                  </motion.button>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Success Animation */}
         <AnimatePresence>
@@ -754,39 +1051,75 @@ function Transactions() {
                   y: 20,
                   opacity: 0
                 }}
-                className="bg-white/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-10 border border-white/50"
+                className="bg-white/80 backdrop-blur-xl rounded-3xl w-full max-w-sm relative overflow-hidden border border-white/50"
               >
-                <div className="flex flex-col items-center text-center space-y-6 sm:space-y-8">
-                  <div className="relative group">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-red-600 rounded-xl sm:rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-500 animate-pulse"></div>
-                    <div className="relative w-16 h-16 sm:w-24 sm:h-24 rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-2xl transform transition-all duration-500 group-hover:scale-105">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-12 sm:w-12 text-white transform group-hover:rotate-12 transition duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                {/* Header */}
+                <motion.div 
+                  className="flex items-center justify-between p-4 border-b border-gray-100/50"
+                >
+                  <h2 className="text-lg font-semibold text-gray-800">Hapus Transaksi</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setDeleteConfirm({ show: false, id: null })}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </motion.div>
+
+                {/* Content */}
+                <div className="p-4">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 20,
+                        delay: 0.2
+                      }}
+                      className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center text-white"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2 sm:mb-3">Hapus Transaksi?</h3>
-                    <p className="text-base sm:text-lg text-gray-500">Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan.</p>
-                  </div>
-                  <div className="flex items-center space-x-4 w-full">
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setDeleteConfirm({ show: false, id: null })}
-                      className="flex-1 px-6 sm:px-8 py-3 sm:py-4 rounded-xl bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition-all duration-300 shadow-lg hover:shadow-xl text-base sm:text-lg"
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="space-y-2"
                     >
-                      Batal
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={confirmDelete}
-                      className="flex-1 px-6 sm:px-8 py-3 sm:py-4 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl text-base sm:text-lg"
-                    >
-                      Hapus
-                    </motion.button>
+                      <h3 className="text-lg font-semibold text-gray-800">Konfirmasi Hapus</h3>
+                      <p className="text-sm text-gray-500">
+                        Apakah Anda yakin ingin menghapus transaksi ini? Tindakan ini tidak dapat dibatalkan.
+                      </p>
+                    </motion.div>
                   </div>
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 border-t border-gray-100/50 space-x-3 flex">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setDeleteConfirm({ show: false, id: null })}
+                    className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm hover:bg-gray-200 transition-colors"
+                  >
+                    Batal
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={confirmDelete}
+                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium text-sm hover:from-red-600 hover:to-red-700 transition-all"
+                  >
+                    Hapus
+                  </motion.button>
                 </div>
               </motion.div>
             </motion.div>
@@ -906,139 +1239,10 @@ function Transactions() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/20 backdrop-blur-xl flex items-start justify-center z-50 p-4"
+              className="fixed inset-0 bg-black/20 backdrop-blur-xl flex items-center justify-center z-50 p-4"
             >
               <motion.div
-                initial={{ scale: 0.9, y: 50 }}
-                animate={{ 
-                  scale: 1, 
-                  y: 0,
-                  transition: {
-                    type: "spring",
-                    stiffness: 400,
-                    damping: 30
-                  }
-                }}
-                exit={{ 
-                  scale: 0.9,
-                  y: 50,
-                  transition: {
-                    duration: 0.2
-                  }
-                }}
-                className="bg-white/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl border border-white/50 mt-4 sm:mt-8"
-              >
-                <div className="px-6 sm:px-10 py-6 sm:py-8 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Detail Transaksi</h2>
-                    <motion.button
-                      whileHover={{ scale: 1.1, rotate: 90 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setShowPreviewModal(false)}
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors duration-300"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </motion.button>
-                  </div>
-                </div>
-
-                <div className="p-6 sm:p-10">
-                  <div className="space-y-6 sm:space-y-8">
-                    {/* Transaction Icon and Type */}
-                    <div className="flex items-center space-x-4 sm:space-x-6">
-                      <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-xl ${
-                        selectedTransaction.type === 'income' 
-                          ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                          : 'bg-gradient-to-br from-red-400 to-red-600'
-                      }`}>
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 text-white drop-shadow-lg">
-                          {getCategoryIcon(selectedTransaction.category)}
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-2xl sm:text-3xl font-bold text-gray-800">{selectedTransaction.category}</h3>
-                        <p className={`text-sm sm:text-base font-medium ${
-                          selectedTransaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
-                        }`}>
-                          {selectedTransaction.type === 'income' ? 'Pendapatan' : 'Pengeluaran'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Amount */}
-                    <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-xl border border-white/50">
-                      <p className="text-sm sm:text-base font-medium text-gray-500 mb-2">Jumlah</p>
-                      <p className={`text-2xl sm:text-4xl font-bold ${
-                        selectedTransaction.type === 'income' ? 'text-emerald-500' : 'text-red-500'
-                      }`}>
-                        Rp {selectedTransaction.amount.toLocaleString()}
-                      </p>
-                    </div>
-
-                    {/* Date */}
-                    <div>
-                      <p className="text-sm sm:text-base font-medium text-gray-500 mb-2">Tanggal</p>
-                      <p className="text-base sm:text-xl font-medium text-gray-800">
-                        {new Date(selectedTransaction.date).toLocaleDateString('id-ID', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
-
-                    {/* Notes */}
-                    {selectedTransaction.notes && (
-                      <div>
-                        <p className="text-sm sm:text-base font-medium text-gray-500 mb-2">Catatan</p>
-                        <p className="text-base sm:text-xl text-gray-800 bg-white/60 backdrop-blur-xl rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-xl border border-white/50">
-                          {selectedTransaction.notes}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-8 sm:mt-10 flex space-x-4 sm:space-x-6">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setShowPreviewModal(false)}
-                      className="flex-1 py-3 sm:py-5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg sm:rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl text-sm sm:text-lg"
-                    >
-                      Tutup
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        setShowPreviewModal(false);
-                        handleDelete(selectedTransaction.id);
-                      }}
-                      className="flex-1 py-3 sm:py-5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-lg sm:rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl text-sm sm:text-lg"
-                    >
-                      Hapus
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Add Transaction Modal */}
-        <AnimatePresence>
-          {showModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/20 backdrop-blur-xl flex items-start justify-center z-50 p-4 overflow-y-auto"
-            >
-              <motion.div
-                initial={{ scale: 0.9, y: 50 }}
+                initial={{ scale: 0.9, y: 20 }}
                 animate={{ 
                   scale: 1,
                   y: 0,
@@ -1050,154 +1254,141 @@ function Transactions() {
                 }}
                 exit={{ 
                   scale: 0.9,
-                  y: 50,
+                  y: 20,
                   opacity: 0
                 }}
-                className="bg-white/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl border border-white/50 mt-4 sm:mt-8 mb-20"
+                className="bg-white/80 backdrop-blur-xl rounded-3xl w-full max-w-sm relative overflow-hidden border border-white/50"
               >
-                <div className="px-6 sm:px-10 py-6 sm:py-8 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Tambah Transaksi</h2>
-                    <motion.button
-                      whileHover={{ scale: 1.1, rotate: 90 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setShowModal(false)}
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl hover:bg-gray-100 flex items-center justify-center transition-colors duration-300"
-                    >
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        className="h-5 w-5 sm:h-6 sm:w-6" 
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
-                      >
-                        <path 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
-                          strokeWidth={2.5} 
-                          d="M12 4v16m8-8H4" 
-                        />
-                      </svg>
-                    </motion.button>
-                  </div>
-                </div>
+                {/* Header with Close Button */}
+                <motion.div 
+                  className="flex items-center justify-between p-4 border-b border-gray-100/50"
+                >
+                  <h2 className="text-lg font-semibold text-gray-800">Detail Transaksi</h2>
+                  <motion.button
+                    whileHover={{ scale: 1.1, rotate: 90 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowPreviewModal(false)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </motion.div>
 
-                <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-6 sm:space-y-8">
-                  {/* Transaction Type */}
-                  <div className="space-y-2 sm:space-y-3">
-                    <label className="text-sm sm:text-base font-medium text-gray-700">Jenis Transaksi</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="button"
-                        onClick={() => setType('income')}
-                        className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 flex flex-col items-center space-y-2 sm:space-y-3 ${
-                          type === 'income'
-                            ? 'border-emerald-500 bg-emerald-50 text-emerald-600'
-                            : 'border-gray-200 hover:border-emerald-200 hover:bg-emerald-50/50'
+                {/* Content */}
+                <div className="p-4 space-y-6">
+                  {/* Category and Type */}
+                  <div className="flex items-center gap-4">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                        selectedTransaction.type === 'income' 
+                          ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white'
+                          : 'bg-gradient-to-br from-red-400 to-red-600 text-white'
+                      }`}
+                    >
+                      <div className="w-6 h-6">
+                        {getCategoryIcon(selectedTransaction.category)}
+                      </div>
+                    </motion.div>
+                    <div>
+                      <motion.h3 
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-lg font-semibold text-gray-800"
+                      >
+                        {selectedTransaction.category}
+                      </motion.h3>
+                      <motion.p
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className={`text-sm font-medium ${
+                          selectedTransaction.type === 'income' 
+                            ? 'text-emerald-500'
+                            : 'text-red-500'
                         }`}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span className="font-medium">Pendapatan</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="button"
-                        onClick={() => setType('expense')}
-                        className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 flex flex-col items-center space-y-2 sm:space-y-3 ${
-                          type === 'expense'
-                            ? 'border-red-500 bg-red-50 text-red-600'
-                            : 'border-gray-200 hover:border-red-200 hover:bg-red-50/50'
-                        }`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                        <span className="font-medium">Pengeluaran</span>
-                      </motion.button>
+                        {selectedTransaction.type === 'income' ? 'Pendapatan' : 'Pengeluaran'}
+                      </motion.p>
                     </div>
-                  </div>
-
-                  {/* Category */}
-                  <div className="space-y-2 sm:space-y-3">
-                    <label className="text-sm sm:text-base font-medium text-gray-700">Kategori</label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base"
-                      required
-                    >
-                      <option value="">Pilih Kategori</option>
-                      {type === 'income'
-                        ? categories.income.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat}
-                            </option>
-                          ))
-                        : categories.expense.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat}
-                            </option>
-                          ))}
-                    </select>
                   </div>
 
                   {/* Amount */}
-                  <div className="space-y-2 sm:space-y-3">
-                    <label className="text-sm sm:text-base font-medium text-gray-700">Jumlah</label>
-                    <div className="relative">
-                      <span className="absolute left-4 sm:left-6 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm sm:text-base">Rp</span>
-                      <input
-                        type="text"
-                        value={amount ? formatNumber(amount) : ''}
-                        onChange={handleAmountChange}
-                        className="w-full pl-12 sm:pl-16 pr-4 sm:pr-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base"
-                        placeholder="0"
-                        required
-                      />
-                    </div>
-                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30"
+                  >
+                    <p className="text-sm text-gray-500 mb-1">Jumlah</p>
+                    <p className={`text-2xl font-bold ${
+                      selectedTransaction.type === 'income' 
+                        ? 'text-emerald-500'
+                        : 'text-red-500'
+                    }`}>
+                      Rp {selectedTransaction.amount.toLocaleString()}
+                    </p>
+                  </motion.div>
 
                   {/* Date */}
-                  <div className="space-y-2 sm:space-y-3">
-                    <label className="text-sm sm:text-base font-medium text-gray-700">Tanggal</label>
-                    <DatePicker
-                      selected={date}
-                      onChange={(date) => setDate(date)}
-                      dateFormat="dd/MM/yyyy"
-                      className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base"
-                    />
-                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <p className="text-sm text-gray-500 mb-1">Tanggal</p>
+                    <p className="text-base font-medium text-gray-800">
+                      {new Date(selectedTransaction.date).toLocaleDateString('id-ID', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </motion.div>
 
                   {/* Notes */}
-                  <div className="space-y-2 sm:space-y-3">
-                    <label className="text-sm sm:text-base font-medium text-gray-700">Catatan (Opsional)</label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      className="w-full px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 text-gray-800 text-sm sm:text-base h-24 sm:h-32 resize-none"
-                      placeholder="Tambahkan catatan..."
-                    />
-                  </div>
+                  {selectedTransaction.notes && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.7 }}
+                    >
+                      <p className="text-sm text-gray-500 mb-1">Catatan</p>
+                      <p className="text-base text-gray-800 bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30">
+                        {selectedTransaction.notes}
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
 
-                  {/* Submit Button */}
+                {/* Actions */}
+                <div className="p-4 border-t border-gray-100/50 space-x-3 flex">
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    type="submit"
-                    className={`w-full py-4 sm:py-5 rounded-xl sm:rounded-2xl text-white font-medium text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all duration-300 ${
-                      type === 'income'
-                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700'
-                        : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
-                    }`}
+                    onClick={() => setShowPreviewModal(false)}
+                    className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm hover:bg-gray-200 transition-colors"
                   >
-                    Simpan Transaksi
+                    Tutup
                   </motion.button>
-                </form>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setShowPreviewModal(false);
+                      handleDelete(selectedTransaction.id);
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium text-sm hover:from-red-600 hover:to-red-700 transition-all"
+                  >
+                    Hapus
+                  </motion.button>
+                </div>
               </motion.div>
             </motion.div>
           )}

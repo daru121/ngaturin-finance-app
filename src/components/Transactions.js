@@ -498,23 +498,72 @@ function Transactions({ showAddModal, setShowAddModal }) {
             {/* DatePicker */}
             <div className="relative group w-full sm:w-auto">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <DatePicker
-                selected={startDate}
-                onChange={(date) => setStartDate(date)}
-                dateFormat="d MMMM yyyy"
-                locale="id"
-                renderCustomHeader={CustomHeader}
-                renderDayContents={(dayOfMonth, date) => (
-                  <CustomDay date={date} dayOfMonth={dayOfMonth} />
-                )}
-                showPopperArrow={false}
-                className="w-full sm:w-auto px-4 sm:px-6 py-2.5 rounded-xl bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl border border-white/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-                calendarClassName="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden"
-                dayClassName={() => "hover:bg-blue-50 rounded-full"}
-                monthClassName={() => "mt-2"}
-                weekDayClassName={() => "text-gray-400 font-medium text-center py-2"}
-                formatWeekDay={day => indonesianLocale.weekdaysShort[new Date(day).getDay()]}
-              />
+              {view === 'daily' ? (
+                <DatePicker
+                  selected={startDate}
+                  onChange={(date) => setStartDate(date)}
+                  dateFormat="d MMMM yyyy"
+                  locale="id"
+                  renderCustomHeader={CustomHeader}
+                  renderDayContents={(dayOfMonth, date) => (
+                    <CustomDay date={date} dayOfMonth={dayOfMonth} />
+                  )}
+                  showPopperArrow={false}
+                  className="w-full sm:w-auto px-4 sm:px-6 py-2.5 rounded-xl bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl border border-white/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                  calendarClassName="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden"
+                  dayClassName={() => "hover:bg-blue-50 rounded-full"}
+                  monthClassName={() => "mt-2"}
+                  weekDayClassName={() => "text-gray-400 font-medium text-center py-2"}
+                  formatWeekDay={day => indonesianLocale.weekdaysShort[new Date(day).getDay()]}
+                />
+              ) : (
+                <DatePicker
+                  selected={startDate}
+                  onChange={(date) => setStartDate(date)}
+                  dateFormat="MMMM yyyy"
+                  locale="id"
+                  showMonthYearPicker
+                  showFullMonthYearPicker
+                  showPopperArrow={false}
+                  className="w-full sm:w-auto px-4 sm:px-6 py-2.5 rounded-xl bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl border border-white/50 shadow-[0_4px_20px_rgb(0,0,0,0.03)] text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                  calendarClassName="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden"
+                  renderCustomHeader={({
+                    date,
+                    decreaseYear,
+                    increaseYear,
+                    prevMonthButtonDisabled,
+                    nextMonthButtonDisabled,
+                  }) => (
+                    <div className="flex items-center justify-between px-2 py-2">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={decreaseYear}
+                        disabled={prevMonthButtonDisabled}
+                        className="p-1 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </motion.button>
+                      <h3 className="text-base font-semibold text-gray-800">
+                        {date.getFullYear()}
+                      </h3>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={increaseYear}
+                        disabled={nextMonthButtonDisabled}
+                        className="p-1 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </motion.button>
+                    </div>
+                  )}
+                />
+              )}
             </div>
           </div>
 

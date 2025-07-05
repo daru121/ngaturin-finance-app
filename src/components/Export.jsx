@@ -120,6 +120,11 @@ function Export() {
       expense: new Map()
     };
 
+    const transactionsByCategory = {
+      income: new Map(),
+      expense: new Map()
+    };
+
     const totals = filteredTransactions.reduce(
       (acc, transaction) => {
         const amount = transaction.amount;
@@ -127,10 +132,28 @@ function Export() {
           acc.income += amount;
           const currentAmount = categoryMap.income.get(transaction.category) || 0;
           categoryMap.income.set(transaction.category, currentAmount + amount);
+          
+          // Store transactions for each category
+          if (!transactionsByCategory.income.has(transaction.category)) {
+            transactionsByCategory.income.set(transaction.category, []);
+          }
+          transactionsByCategory.income.get(transaction.category).push({
+            date: new Date(transaction.date),
+            amount: transaction.amount
+          });
         } else {
           acc.expense += amount;
           const currentAmount = categoryMap.expense.get(transaction.category) || 0;
           categoryMap.expense.set(transaction.category, currentAmount + amount);
+          
+          // Store transactions for each category
+          if (!transactionsByCategory.expense.has(transaction.category)) {
+            transactionsByCategory.expense.set(transaction.category, []);
+          }
+          transactionsByCategory.expense.get(transaction.category).push({
+            date: new Date(transaction.date),
+            amount: transaction.amount
+          });
         }
         return acc;
       },
@@ -140,11 +163,15 @@ function Export() {
     const categoryTotals = {
       income: Array.from(categoryMap.income.entries()).map(([category, amount]) => ({
         category,
-        amount
+        amount,
+        transactions: transactionsByCategory.income.get(category)
+          .sort((a, b) => b.date - a.date) // Sort by date descending
       })),
       expense: Array.from(categoryMap.expense.entries()).map(([category, amount]) => ({
         category,
-        amount
+        amount,
+        transactions: transactionsByCategory.expense.get(category)
+          .sort((a, b) => b.date - a.date) // Sort by date descending
       }))
     };
 
@@ -380,11 +407,21 @@ function Export() {
                 {/* Income Categories */}
                 <div>
                   <h3 className="text-sm font-medium text-emerald-500 mb-3">Pendapatan</h3>
-                  <div className="space-y-2">
-                    {categoryTotals.income.map(({ category, amount }) => (
-                      <div key={category} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                        <span className="text-sm text-gray-600">{category}</span>
-                        <span className="text-sm font-medium text-emerald-500">Rp {amount.toLocaleString()}</span>
+                  <div className="space-y-4">
+                    {categoryTotals.income.map(({ category, amount, transactions }) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                          <span className="text-sm font-medium text-gray-700">{category}</span>
+                          <span className="text-sm font-medium text-emerald-500">Rp {amount.toLocaleString()}</span>
+                        </div>
+                        <div className="pl-4 space-y-1">
+                          {transactions.map((transaction, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{format(transaction.date, 'd MMMM yyyy', { locale: id })}</span>
+                              <span>Rp {transaction.amount.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -393,11 +430,21 @@ function Export() {
                 {/* Expense Categories */}
                 <div>
                   <h3 className="text-sm font-medium text-red-500 mb-3">Pengeluaran</h3>
-                  <div className="space-y-2">
-                    {categoryTotals.expense.map(({ category, amount }) => (
-                      <div key={category} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                        <span className="text-sm text-gray-600">{category}</span>
-                        <span className="text-sm font-medium text-red-500">Rp {amount.toLocaleString()}</span>
+                  <div className="space-y-4">
+                    {categoryTotals.expense.map(({ category, amount, transactions }) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                          <span className="text-sm font-medium text-gray-700">{category}</span>
+                          <span className="text-sm font-medium text-red-500">Rp {amount.toLocaleString()}</span>
+                        </div>
+                        <div className="pl-4 space-y-1">
+                          {transactions.map((transaction, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{format(transaction.date, 'd MMMM yyyy', { locale: id })}</span>
+                              <span>Rp {transaction.amount.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>

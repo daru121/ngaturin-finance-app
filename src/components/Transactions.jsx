@@ -999,7 +999,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                   }
                 }}
                 style={{ willChange: 'transform' }}
-                className="relative"
+                className="relative flex flex-col items-center"
               >
                 <motion.div
                   initial={{ scale: 0.5, opacity: 0 }}
@@ -1010,7 +1010,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                       duration: 0.3
                     }
                   }}
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-emerald-500/20 backdrop-blur-2xl flex items-center justify-center"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-500/20 backdrop-blur-2xl flex items-center justify-center"
                 >
                   <motion.div
                     initial={{ scale: 0.5, opacity: 0 }}
@@ -1022,11 +1022,11 @@ function Transactions({ showAddModal, setShowAddModal }) {
                         duration: 0.3
                       }
                     }}
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-2xl"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-2xl"
                   >
                     <motion.svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="w-12 h-12 sm:w-14 sm:h-14 text-white drop-shadow-2xl"
+                      className="w-10 h-10 sm:w-12 sm:h-12 text-white drop-shadow-2xl"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -1061,14 +1061,14 @@ function Transactions({ showAddModal, setShowAddModal }) {
                       duration: 0.3
                     }
                   }}
-                  className="absolute -bottom-16 sm:-bottom-20 left-1/2 transform -translate-x-1/2 w-max"
+                  className="mt-6 sm:mt-8"
                 >
-                  <div className="bg-white/80 backdrop-blur-2xl px-4 sm:px-6 py-2 sm:py-3 rounded-xl shadow-2xl border border-white/50">
-                    <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                      <h3 className="text-base sm:text-lg font-bold text-gray-800">
+                  <div className="bg-white/80 backdrop-blur-2xl px-6 py-4 rounded-2xl shadow-2xl border border-white/50">
+                    <div className="flex flex-col items-center space-y-1">
+                      <h3 className="text-lg sm:text-xl font-bold text-gray-800">
                         Transaksi Berhasil
                       </h3>
-                      <p className="text-xs sm:text-sm text-emerald-500 font-medium">
+                      <p className="text-sm sm:text-base text-emerald-500 font-medium">
                         Data telah tersimpan
                       </p>
                     </div>
@@ -1205,7 +1205,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                     duration: 0.2
                   }
                 }}
-                className="relative"
+                className="relative flex flex-col items-center"
               >
                 <motion.div
                   initial={{ scale: 0.5, opacity: 0 }}
@@ -1216,7 +1216,7 @@ function Transactions({ showAddModal, setShowAddModal }) {
                       duration: 0.3
                     }
                   }}
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-red-500/20 backdrop-blur-2xl flex items-center justify-center"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-500/20 backdrop-blur-2xl flex items-center justify-center"
                 >
                   <motion.div
                     initial={{ scale: 0.5, opacity: 0 }}
@@ -1228,11 +1228,11 @@ function Transactions({ showAddModal, setShowAddModal }) {
                         duration: 0.3
                       }
                     }}
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-2xl"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-2xl"
                   >
                     <motion.svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="w-12 h-12 sm:w-14 sm:h-14 text-white drop-shadow-2xl"
+                      className="w-10 h-10 sm:w-12 sm:h-12 text-white drop-shadow-2xl"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -1267,14 +1267,14 @@ function Transactions({ showAddModal, setShowAddModal }) {
                       duration: 0.3
                     }
                   }}
-                  className="absolute -bottom-16 sm:-bottom-20 left-1/2 transform -translate-x-1/2 w-max"
+                  className="mt-6 sm:mt-8"
                 >
-                  <div className="bg-white/80 backdrop-blur-2xl px-4 sm:px-6 py-2 sm:py-3 rounded-xl shadow-2xl border border-white/50">
-                    <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                      <h3 className="text-base sm:text-lg font-bold text-gray-800">
+                  <div className="bg-white/80 backdrop-blur-2xl px-6 py-4 rounded-2xl shadow-2xl border border-white/50">
+                    <div className="flex flex-col items-center space-y-1">
+                      <h3 className="text-lg sm:text-xl font-bold text-gray-800">
                         Transaksi Terhapus
                       </h3>
-                      <p className="text-xs sm:text-sm text-red-500 font-medium">
+                      <p className="text-sm sm:text-base text-red-500 font-medium">
                         Data telah dihapus
                       </p>
                     </div>

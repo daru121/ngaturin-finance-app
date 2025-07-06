@@ -3,6 +3,7 @@ import Transactions from './components/Transactions';
 import Statistics from './components/Statistics';
 import Export from './components/Export';
 import Settings from './components/Settings';
+import Goals from './components/Goals';
 import Preloader from './components/Preloader';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -149,6 +150,17 @@ function App() {
                       <Settings />
                     </motion.div>
                   )}
+                  {activeTab === 'goals' && (
+                    <motion.div
+                      key="goals"
+                      variants={contentVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                    >
+                      <Goals />
+                    </motion.div>
+                  )}
                 </AnimatePresence>
               </div>
             </main>
@@ -190,6 +202,17 @@ function App() {
                         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
                           <path d="M8 12L12 16M12 16L16 12M12 16V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )
+                    },
+                    {
+                      id: 'goals',
+                      label: 'Goals',
+                      icon: (
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5"/>
+                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                          <path d="M12 4V2M12 22V20M4 12H2M22 12H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                         </svg>
                       )
                     }
@@ -311,12 +334,34 @@ function App() {
                     </span>
                   </motion.button>
 
-                  {/* Export */}
+                  {/* Goals */}
                   <motion.button
                     variants={navItemVariants}
                     initial="initial"
                     animate="animate"
                     custom={3}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setActiveTab('goals')}
+                    className="flex flex-col items-center justify-center w-16 py-1"
+                  >
+                    <div className={`w-6 h-6 mb-1 ${activeTab === 'goals' ? 'text-blue-500' : 'text-gray-400'}`}>
+                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5"/>
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M12 4V2M12 22V20M4 12H2M22 12H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <span className={`text-[10px] font-medium ${activeTab === 'goals' ? 'text-blue-500' : 'text-gray-500'}`}>
+                      Goals
+                    </span>
+                  </motion.button>
+
+                  {/* Export */}
+                  <motion.button
+                    variants={navItemVariants}
+                    initial="initial"
+                    animate="animate"
+                    custom={4}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setActiveTab('export')}
                     className="flex flex-col items-center justify-center w-16 py-1"
@@ -329,27 +374,6 @@ function App() {
                     </div>
                     <span className={`text-[10px] font-medium ${activeTab === 'export' ? 'text-blue-500' : 'text-gray-500'}`}>
                       Export
-                    </span>
-                  </motion.button>
-
-                  {/* Settings */}
-                  <motion.button
-                    variants={navItemVariants}
-                    initial="initial"
-                    animate="animate"
-                    custom={4}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setActiveTab('settings')}
-                    className="flex flex-col items-center justify-center w-16 py-1"
-                  >
-                    <div className={`w-6 h-6 mb-1 ${activeTab === 'settings' ? 'text-blue-500' : 'text-gray-400'}`}>
-                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" stroke="currentColor" strokeWidth="1.5"/>
-                        <path d="M19.4 15C19.1277 15.6171 19.2583 16.3378 19.73 16.82L19.79 16.88C20.1656 17.2551 20.3765 17.7642 20.3765 18.295C20.3765 18.8258 20.1656 19.3349 19.79 19.71C19.4149 20.0856 18.9058 20.2965 18.375 20.2965C17.8442 20.2965 17.3351 20.0856 16.96 19.71L16.9 19.65C16.4178 19.1783 15.6971 19.0477 15.08 19.32C14.4755 19.5791 14.0826 20.1724 14.08 20.83V21C14.08 22.1046 13.1846 23 12.08 23C10.9754 23 10.08 22.1046 10.08 21V20.91C10.0642 20.2256 9.63587 19.6146 9 19.36C8.38291 19.0877 7.66219 19.2183 7.18 19.69L7.12 19.75C6.74486 20.1256 6.23582 20.3365 5.705 20.3365C5.17418 20.3365 4.66514 20.1256 4.29 19.75C3.91445 19.3749 3.70351 18.8658 3.70351 18.335C3.70351 17.8042 3.91445 17.2951 4.29 16.92L4.35 16.86C4.82167 16.3778 4.95231 15.6571 4.68 15.04C4.42093 14.4355 3.82764 14.0426 3.17 14.04H3C1.89543 14.04 1 13.1446 1 12.04C1 10.9354 1.89543 10.04 3 10.04H3.09C3.77444 10.0242 4.38538 9.59587 4.64 8.96C4.91231 8.34291 4.78167 7.62219 4.31 7.14L4.25 7.08C3.87445 6.70486 3.66351 6.19582 3.66351 5.665C3.66351 5.13418 3.87445 4.62514 4.25 4.25C4.62514 3.87445 5.13418 3.66351 5.665 3.66351C6.19582 3.66351 6.70486 3.87445 7.08 4.25L7.14 4.31C7.62219 4.78167 8.34291 4.91231 8.96 4.64H9C9.60455 4.38093 9.99744 3.78764 10 3.13V3C10 1.89543 10.8954 1 12 1C13.1046 1 14 1.89543 14 3V3.09C14.0026 3.74764 14.3955 4.34093 15 4.6C15.6171 4.87231 16.3378 4.74167 16.82 4.27L16.88 4.21C17.2551 3.83445 17.7642 3.62351 18.295 3.62351C18.8258 3.62351 19.3349 3.83445 19.71 4.21C20.0856 4.58514 20.2965 5.09418 20.2965 5.625C20.2965 6.15582 20.0856 6.66486 19.71 7.04L19.65 7.1C19.1783 7.58219 19.0477 8.30291 19.32 8.92V9C19.5791 9.60455 20.1724 9.99744 20.83 10H21C22.1046 10 23 10.8954 23 12C23 13.1046 22.1046 14 21 14H20.91C20.2524 14.0026 19.6591 14.3955 19.4 15Z" stroke="currentColor" strokeWidth="1.5"/>
-                      </svg>
-                    </div>
-                    <span className={`text-[10px] font-medium ${activeTab === 'settings' ? 'text-blue-500' : 'text-gray-500'}`}>
-                      Settings
                     </span>
                   </motion.button>
                 </div>

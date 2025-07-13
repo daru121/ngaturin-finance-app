@@ -115,4 +115,4 @@ Link Proyek: [https://github.com/daru121/ngaturin-finance-app](https://github.co
 
 ---
 
-Dibuat dengan ❤️ oleh Daru Caraka
+Dibuat oleh Daru Caraka
